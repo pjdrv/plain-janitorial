@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(CLIENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  buildings     Building[]
+  cleaningLogs  CleaningLog[]
+  subscriptions Subscription[]
+}
+
+model Building {
+  id              String   @id @default(cuid())
+  name            String
+  address         String
+  squareFeet      Int
+  type            BuildingType
+  cleaningFrequency String
+  autonomousSplit Float    @default(0.7)
+  humanSplit      Float    @default(0.3)
+  monthlyPrice    Float
+  status          BuildingStatus @default(ACTIVE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  robots          Robot[]
+  sensors         Sensor[]
+  cleaningLogs    CleaningLog[]
+}
+
+model Robot {
+  id            String      @id @default(cuid())
+  name          String
+  model         String
+  status        RobotStatus @default(IDLE)
+  batteryLevel  Int         @default(100)
+  location      String?
+  lastCleaned   DateTime?
+  totalHours    Int         @default(0)
+  sqFtCleaned   Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  buildingId    String
+  building      Building    @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  activities    RobotActivity[]
+}
+
+model Sensor {
+  id          String      @id @default(cuid())
+  type        SensorType
+  name        String
+  value       Float
+  unit        String
+  status      SensorStatus @default(ONLINE)
+  lastReading DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  buildingId  String
+  building    Building    @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  readings    SensorReading[]
+}
+
+model CleaningLog {
+  id          String    @id @default(cuid())
+  type        CleaningType
+  status      String
+  notes       String?
+  photos      String[]
+  startedAt   DateTime
+  completedAt DateTime?
+  sqFtCleaned Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  buildingId  String
+  building    Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+  robotId     String?
+}
+
+model RobotActivity {
+  id          String    @id @default(cuid())
+  action      String
+  location    String?
+  duration    Int?
+  sqFtCleaned Int?
+  timestamp   DateTime  @default(now())
+
+  robotId     String
+  robot       Robot     @relation(fields: [robotId], references: [id], onDelete: Cascade)
+}
+
+model SensorReading {
+  id        String   @id @default(cuid())
+  value     Float
+  timestamp DateTime @default(now())
+
+  sensorId  String
+  sensor    Sensor   @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id              String   @id @default(cuid())
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  stripePriceId   String?
+  status          SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  CLEANER
+  CLIENT
+}
+
+enum BuildingType {
+  OFFICE
+  RETAIL
+  HEALTHCARE
+  EDUCATION
+  WAREHOUSE
+  MANUFACTURING
+  OTHER
+}
+
+enum BuildingStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum RobotStatus {
+  CLEANING
+  CHARGING
+  IDLE
+  MAINTENANCE
+  OFFLINE
+}
+
+enum SensorType {
+  AIR_QUALITY
+  OCCUPANCY
+  RESTROOM_SUPPLIES
+  FLOOR_CLEANLINESS
+  TEMPERATURE
+  HUMIDITY
+}
+
+enum SensorStatus {
+  ONLINE
+  OFFLINE
+  LOW_BATTERY
+  ERROR
+}
+
+enum CleaningType {
+  AUTONOMOUS
+  HUMAN
+  MIXED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  INCOMPLETE
+  PAST_DUE
+  UNPAID
+}
